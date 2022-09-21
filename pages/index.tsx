@@ -1,7 +1,6 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import {User} from '@prisma/client';
-import styles from '../styles/Home.module.css'
 import {
   Text,
   Box,
@@ -26,10 +25,11 @@ import {
 } from '@chakra-ui/react'
 import React, { useRef, useState } from 'react'
 import axios from 'axios';
+import Link from 'next/link';
 
 const Home: NextPage = () => {
   return (
-    <Container minH={'100vh'} color={'white'}>
+    <Container minH={'100vh'} color={'white'} width={'container.lg'}>
       <Head>
       <title>Registration Form</title>
       <meta name="description" content="Sample Registration Form" />
@@ -40,16 +40,18 @@ const Home: NextPage = () => {
         <RegisterFrom/>
       </Center>
 
-      <footer className={styles.footer}>
-      <a
-        href="https://github.com/two4i6"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Copyright @{'Terry W.'}
+      <Center m={'1rem'}>
+      <footer>
+        <a
+          href="https://github.com/two4i6"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Copyright @{'Terry W.'}
 
-      </a>
+        </a>
       </footer>
+      </Center>
     </Container>
   )
 }
@@ -61,8 +63,8 @@ const RegisterFrom = ():JSX.Element => {
   const phoneRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
-  const statusRef = useRef<string>('')
   const [userdata, setUserdata] = useState<User>({} as User);
+  const [errorMessage, setErrorMessage] = useState<string>('error');
 
   const handleSelect = (ref:React.RefObject<HTMLDivElement> ) => {
     ref.current!.style.visibility = 'visible'
@@ -79,8 +81,20 @@ const RegisterFrom = ():JSX.Element => {
         data: userdata
       }).then((res)=> {
         successRef.current!.style.display = 'flex'
-      }).catch((res)=>{
+      }).catch((error)=>{
+        const errorMes = error.response.data as Object
         errorRef.current!.style.display = 'flex'
+        switch(error.response.status){
+          case 406:
+            setErrorMessage(`${error.response.status} - email already exists`)
+          break;
+          case 418:
+            setErrorMessage(`${error.response.status} - error`)
+          break;
+          default:
+            setErrorMessage(`${error.response.status} - something wrong`)
+          break;
+        }
       })
     }
     submit()
@@ -116,13 +130,13 @@ const RegisterFrom = ():JSX.Element => {
           <FormHelperText visibility={'hidden'} ref={lastNameRef}>{'Your last name'}</FormHelperText>
           <FormLabel>Email</FormLabel>
           <Input onSelect={()=>handleSelect(emailRef)} onChange={e=>userDataHandler({email:e.currentTarget.value})} type={'email'}/>
-          <FormHelperText visibility={'hidden'} ref={emailRef}>We&apos;ll never share your email.</FormHelperText>
+          <FormHelperText visibility={'hidden'} ref={emailRef}>{'We will never share your email.'}</FormHelperText>
           <FormLabel>Phone</FormLabel>
           <InputGroup>
             <InputLeftAddon color={'black'}> +1 </InputLeftAddon>
-            <Input onSelect={()=>handleSelect(phoneRef)} onChange={e=>userDataHandler({phone:e.currentTarget.value})} type={'tel'}/>
+            <Input onSelect={()=>handleSelect(phoneRef)} onChange={e=>userDataHandler({phone:e.currentTarget.value})} type={'tel'} pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"/>
           </InputGroup>
-          <FormHelperText visibility={'hidden'} ref={phoneRef}>We&apos;ll never share your number.</FormHelperText>
+          <FormHelperText visibility={'hidden'} ref={phoneRef}>{'We will never share your number (ie. 902-000-0000)'}</FormHelperText>
         </Box>
 
         <Box mb='1rem'>
@@ -165,11 +179,11 @@ const RegisterFrom = ():JSX.Element => {
         <Box color={'black'}>
           <Alert status='error' display={'none'} ref={errorRef} mb='2'>
             <AlertIcon />
-            There was an error processing your request
+            {errorMessage}
           </Alert>
           <Alert status='success' display={'none'} ref={successRef} mb='2'>
             <AlertIcon />
-            Data uploaded to the database. Fire on!
+            Data uploaded to the database. <u><b><Link href={'/overview'}> checkout! </Link></b></u>
           </Alert>
         </Box>
     </form>

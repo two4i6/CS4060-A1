@@ -1,37 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import nc from "next-connect";
-import {prisma, User} from '@prisma/client';
-import { PrismaClient } from '@prisma/client'
+import {PrismaClient, User} from '../../src/generated/client';
 
-// a singleton instance of the database client
-class DatabaseClient {
-    private static instance: DatabaseClient;
-    private dbclient: PrismaClient;
-    
-    private constructor() {
-        this.dbclient = new PrismaClient()
-    }
-
-    get client():PrismaClient { return this.dbclient;}
-
-    public static getInstance(): DatabaseClient {
-        if (!DatabaseClient.instance) {
-            DatabaseClient.instance = new DatabaseClient();
-        }
-        return DatabaseClient.instance;
-    }
-}
-
-const dbclient = DatabaseClient.getInstance().client;
+// a instance of the database client
+let dbclient = new PrismaClient()
 
 interface ExtendedRequest extends NextApiRequest {
   body: User
 }
 
+// logger middleware
 const logger = (req: NextApiRequest, res: NextApiResponse, next: Function) => {
   console.log('req: ' + req.method, req.url, req.headers['x-forwarded-for'] || req.socket.remoteAddress )
   next()
 }
+
 const handler = nc<NextApiRequest, NextApiResponse>({
   onError(error, req, res) {
       res.status(500).json({ error: `Sorry something Happened! ${error.message}` });
@@ -40,22 +23,37 @@ const handler = nc<NextApiRequest, NextApiResponse>({
       res.status(405).json({ error: `Method '${req.method}' Not Allowed` });
   },
 })
-.use(logger)
-.post(async(req:ExtendedRequest, res)=>{
-  let newUser:User
+.use(logger) // use middleware
+.post(async(req:ExtendedRequest, res)=>{ 
+  console.log(req.body) 
+  let result = await dbclient.user.findMany({
+    where: {
+        email: {
+            contains: req.body.email
+        }
+    }
+  })
+  // check if this username is exits
+  if(result.length != 0){
+    res.status(406).json({error: 'user exits'}) 
+  }else{
+    try{
+      const newUser = await dbclient.user.create({
+        data: req.body,
+      })
+      res.status(200).json({success:`user ${newUser.email} registered`})
+    }catch(e){
+      console.log(e)
+      res.status(418).json({error: e})
+    }
+  }
+})
+.get(async(req:ExtendedRequest, res)=>{
   try{
-    newUser= await dbclient.user.create({
-      data:req.body,
-    })
-    res.status(200).json({success:`user ${newUser.email} registered`})
+    const users = await dbclient.user.findMany()
+    res.status(200).json(users)
   }catch(e){
-    await dbclient.user.findMany({
-      where: {
-          email: {
-              contains: req.body.email
-          }
-      }
-    }) !== null ? res.status(406).json({error: 'user exits'}) :
+    console.log(e)
     res.status(418).json({error: e})
   }
 })
